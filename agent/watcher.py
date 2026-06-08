@@ -70,6 +70,7 @@ class WatcherConfig:
         self.provider = os.environ.get("WATCHER_LLM_PROVIDER", "anthropic")
         self.restart_threshold = int(os.environ.get("WATCHER_RESTART_THRESHOLD", "3"))
         self.cooldown = int(os.environ.get("WATCHER_COOLDOWN", "300"))
+        self.email_enabled = os.environ.get("WATCHER_EMAIL_ENABLED", "false").lower() == "true"
 
         raw_ns = (
             os.environ.get("WATCHER_NAMESPACES")
@@ -89,6 +90,14 @@ class Watcher:
         self._config = config
         # pod_key → timestamp of last investigation
         self._last_investigated: dict[str, float] = {}
+        
+        # Email notification setup
+        self._notifier = None
+        if config.email_enabled:
+            from .notifier import EmailConfig, EmailNotifier
+            email_config = EmailConfig.from_env()
+            self._notifier = EmailNotifier(email_config)
+            log.info("Email notifications enabled")
 
     async def run(self) -> None:
         """Start the watch loop. Runs forever until interrupted."""
@@ -193,7 +202,17 @@ class Watcher:
                 provider=self._config.provider,
             )
             result = await investigator.investigate(question)
-            self._print_report(failure, result)
+            
+            # Detect severity
+            from .severity import detect_severity
+            severity = detect_severity(result, failure)
+            
+            # Send email alert if enabled and severity is HIGH or CRITICAL
+            if self._notifier and severity in ["HIGH", "CRITICAL"]:
+                self._notifier.send_alert(failure, result, severity)
+                log.info("Email alert sent  severity=%s", severity)
+            
+            self._print_report(failure, result, severity)
         except Exception as e:
             log.error("Investigation failed  pod=%s  error=%s", key, e)
             print(f"  ❌ Investigation failed: {e}")
@@ -214,10 +233,10 @@ class Watcher:
             return ["default"]
 
     @staticmethod
-    def _print_report(failure: PodFailure, result) -> None:
+    def _print_report(failure: PodFailure, result, severity: str) -> None:
         print(f"\n  {'─' * 56}")
         print(f"  📋 Investigation report: {failure.namespace}/{failure.pod_name}")
-        print(f"  Iterations: {result.iterations}  |  Tools used: {len(result.tool_calls)}")
+        print(f"  Severity: {severity}  |  Iterations: {result.iterations}  |  Tools used: {len(result.tool_calls)}")
         for tc in result.tool_calls:
             print(f"    → {tc['tool']}")
         print(f"\n{result.answer}\n")
