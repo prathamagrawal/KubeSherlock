@@ -19,7 +19,7 @@ from pathlib import Path
 import anyio
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent / "config.env")
 
 from .investigator import Investigator
 from .mcp_client import run_with_mcp
@@ -83,7 +83,7 @@ def main() -> None:
 
     env_key = "ANTHROPIC_API_KEY" if args.provider == "anthropic" else "OPENAI_API_KEY"
     if not os.environ.get(env_key):
-        print(f"Error: {env_key} not set in environment or .env file")
+        print(f"Error: {env_key} not set in environment or config.env file")
         sys.exit(1)
 
     anyio.run(_run, " ".join(args.question), args.namespaces,

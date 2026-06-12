@@ -93,20 +93,24 @@ class Investigator:
         Returns:
             :class:`InvestigationResult` with the final report and call history.
         """
-        log.info("Investigation started  provider=%s  question=%r",
-                 self._provider_name, question)
+        log.info(f"🔍 Investigation started")
+        log.info(f"   Provider: {self._provider_name}")
+        log.info(f"   Question: {question}")
+        log.info(f"   Max iterations: {self._max_iterations}")
 
         start_time = time.time()
         
         # Create investigation record if memory is available
         if self._memory:
             resource_name = _extract_resource_name(question)
+            log.debug(f"   Creating investigation record in database...")
             self._investigation_id = await self._memory.db.create_investigation(
                 question=question,
                 namespace=namespace,
                 resource_name=resource_name,
                 provider=self._provider_name,
             )
+            log.debug(f"   Investigation ID: {self._investigation_id}")
 
         system = SYSTEM_PROMPT.format(max_iterations=self._max_iterations)
         messages: list[dict] = [{"role": "user", "content": question}]
@@ -115,21 +119,24 @@ class Investigator:
         if self._memory:
             context = await self._memory.get_context(namespace, limit=2)
             if context:
+                log.debug(f"   Added historical context from memory")
                 system += "\n\n" + context
 
         tools = self._mcp.tools
+        log.debug(f"   {len(tools)} MCP tools available")
         tool_calls_made: list[dict] = []
         iterations = 0
 
         while iterations < self._max_iterations:
             iterations += 1
-            log.debug("ReAct iteration %d/%d", iterations, self._max_iterations)
+            log.info(f"🔄 ReAct iteration {iterations}/{self._max_iterations}")
 
             try:
                 response = self._llm.chat(system, messages, tools)
+                log.debug(f"   LLM response received")
             except Exception as e:
                 err = str(e)
-                log.error("LLM call failed: %s", err)
+                log.error(f"❌ LLM call failed: {type(e).__name__}: {err}")
                 return InvestigationResult(
                     question=question,
                     answer=f"Investigation failed: LLM error — {err}",
@@ -143,8 +150,12 @@ class Investigator:
 
             # Final answer — no tool calls
             if response.text is not None:
-                log.info("Investigation complete  iterations=%d", iterations)
                 duration = time.time() - start_time
+                log.info(f"✅ Investigation complete!")
+                log.info(f"   Iterations: {iterations}")
+                log.info(f"   Tool calls: {len(tool_calls_made)}")
+                log.info(f"   Duration: {duration:.2f}s")
+                
                 result = InvestigationResult(
                     question=question,
                     answer=response.text,
@@ -155,6 +166,7 @@ class Investigator:
                 
                 # Save to history
                 if self._memory and self._investigation_id:
+                    log.debug(f"   Saving investigation to database...")
                     await self._memory.db.update_investigation(
                         investigation_id=self._investigation_id,
                         answer=response.text,
@@ -169,15 +181,19 @@ class Investigator:
                 return result
 
             # Execute tool calls
+            log.debug(f"   {len(response.tool_calls)} tool call(s) requested")
             results: list[str] = []
             for tc in response.tool_calls:
                 tool_start = time.time()
-                log.info("Tool call  tool=%s  args=%s", tc.name, tc.arguments)
+                log.info(f"🔧 Tool call: {tc.name}")
+                log.debug(f"   Arguments: {tc.arguments}")
                 try:
                     result_str = await self._mcp.call_tool(tc.name, tc.arguments)
+                    tool_duration = time.time() - tool_start
+                    log.debug(f"   ✓ Tool completed in {tool_duration:.2f}s")
                 except Exception as e:
                     result_str = json.dumps({"error": str(e)})
-                    log.warning("Tool call failed  tool=%s  error=%s", tc.name, e)
+                    log.warning(f"   ⚠️  Tool call failed: {type(e).__name__}: {e}")
 
                 tool_time_ms = int((time.time() - tool_start) * 1000)
                 tool_calls_made.append({

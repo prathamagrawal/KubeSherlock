@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All configuration via environment variables or `.env` file.
+All configuration via environment variables or `config.env` file.
 
 ---
 
@@ -95,7 +95,7 @@ WATCHER_LLM_PROVIDER=anthropic
 
 ---
 
-## Complete .env Example
+## Complete config.env Example
 
 ```
 # Kubernetes

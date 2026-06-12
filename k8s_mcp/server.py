@@ -11,13 +11,15 @@ registered when DESTRUCTIVE_ACTIONS_ENABLED=true in the environment.
 import argparse
 import logging
 import os
+import signal
+import sys
 from dataclasses import asdict
 from pathlib import Path
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent / "config.env")
 
 from .client import K8sClient
 from .logging_config import configure_logging
@@ -247,7 +249,19 @@ def main() -> None:
         log.info("Destructive tools NOT registered (DESTRUCTIVE_ACTIONS_ENABLED=false)")
 
     _init(namespaces, destructive)
-    mcp.run()
+
+    def _shutdown(signum, frame):
+        log.info("Received signal %s — shutting down", signum)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    try:
+        mcp.run()
+    except KeyboardInterrupt:
+        log.info("Interrupted — shutting down")
+        sys.exit(0)
 
 
 if __name__ == "__main__":

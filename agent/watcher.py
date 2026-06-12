@@ -12,7 +12,7 @@ Detects:
 - Pods in Failed phase
 - Pods exceeding restart threshold
 
-Config (all via environment / .env):
+Config (all via environment / config.env):
     WATCHER_ENABLED           true/false (default: true)
     WATCHER_POLL_INTERVAL     seconds between polls (default: 30)
     WATCHER_NAMESPACES        comma-separated, falls back to ALLOWED_NAMESPACES
@@ -35,7 +35,7 @@ from pathlib import Path
 import anyio
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent / "config.env")
 
 from .investigator import Investigator
 from .mcp_client import run_with_mcp
@@ -91,13 +91,35 @@ class Watcher:
         # pod_key → timestamp of last investigation
         self._last_investigated: dict[str, float] = {}
         
+        log.info("🚀 Initializing KubeSherlock Watcher")
+        log.info(f"   Provider: {config.provider}")
+        log.info(f"   Namespaces: {config.namespaces or 'ALL'}")
+        log.info(f"   Poll interval: {config.poll_interval}s")
+        log.info(f"   Restart threshold: {config.restart_threshold}")
+        log.info(f"   Cooldown: {config.cooldown}s")
+        
         # Email notification setup
         self._notifier = None
         if config.email_enabled:
+            log.info("📧 Email notifications ENABLED - setting up...")
             from .notifier import EmailConfig, EmailNotifier
-            email_config = EmailConfig.from_env()
-            self._notifier = EmailNotifier(email_config)
-            log.info("Email notifications enabled")
+            try:
+                email_config = EmailConfig.from_env()
+                
+                if not email_config.smtp_user or not email_config.smtp_password:
+                    log.error("❌ Email enabled but SMTP credentials missing in config.env")
+                    log.error("   Set SMTP_USER and SMTP_PASSWORD to enable email alerts")
+                elif not email_config.alert_email_to:
+                    log.warning("⚠️  Email enabled but no recipients configured (ALERT_EMAIL_TO is empty)")
+                else:
+                    self._notifier = EmailNotifier(email_config)
+                    log.info(f"✅ Email notifications configured successfully")
+                    log.info(f"   Recipients: {', '.join(email_config.alert_email_to)}")
+                    log.info(f"   SMTP: {email_config.smtp_host}:{email_config.smtp_port}")
+            except Exception as e:
+                log.error(f"❌ Failed to initialize email notifier: {e}")
+        else:
+            log.info("📧 Email notifications DISABLED (WATCHER_EMAIL_ENABLED=false)")
 
     async def run(self) -> None:
         """Start the watch loop. Runs forever until interrupted."""
@@ -140,20 +162,26 @@ class Watcher:
         namespaces = self._config.namespaces or self._get_all_namespaces()
         failures: list[PodFailure] = []
 
+        log.debug(f"🔄 Starting poll cycle - checking {len(namespaces)} namespace(s)")
+        
         for ns in namespaces:
             try:
+                log.debug(f"   Checking namespace: {ns}")
                 pods = pods_tool.list_pods(ns)
+                log.debug(f"   Found {len(pods)} pods in {ns}")
                 for pod in pods:
                     failure = self._detect_failure(ns, pod)
                     if failure:
                         failures.append(failure)
+                        log.debug(f"   ⚠️  Failure detected: {failure}")
             except Exception as e:
-                log.warning("Poll failed  namespace=%s  error=%s", ns, e)
+                log.warning(f"❌ Poll failed for namespace {ns}: {e}")
 
         if not failures:
-            log.debug("Poll complete — no failures detected")
+            log.debug("✅ Poll complete — no failures detected")
             return
 
+        log.info(f"⚠️  Poll complete — {len(failures)} failure(s) detected")
         print(f"\n[{datetime.now().strftime('%H:%M:%S')}] ⚠️  {len(failures)} failure(s) detected:")
         for f in failures:
             print(f"  • {f}")
@@ -206,7 +234,7 @@ class Watcher:
 
         if now - last < self._config.cooldown:
             remaining = int(self._config.cooldown - (now - last))
-            log.debug("Skipping %s — cooldown (%ds remaining)", key, remaining)
+            log.debug(f"⏳ Skipping {key} — cooldown ({remaining}s remaining)")
             print(f"    ⏳ {key} — cooldown ({remaining}s remaining)")
             return
 
@@ -218,27 +246,37 @@ class Watcher:
         )
 
         print(f"\n  🔍 Investigating {key} ({failure.reason})...")
-        log.info("Auto-investigation triggered  pod=%s  reason=%s", key, failure.reason)
+        log.info(f"🔍 Auto-investigation triggered for {key} (reason: {failure.reason})")
 
         try:
             investigator = Investigator(
                 mcp_client=mcp_client,
                 provider=self._config.provider,
             )
+            log.debug(f"   Running investigation with {self._config.provider}...")
             result = await investigator.investigate(question)
+            log.info(f"✅ Investigation completed - {result.iterations} iterations, {len(result.tool_calls)} tool calls")
             
             # Detect severity
             from .severity import detect_severity
             severity = detect_severity(result, failure)
+            log.info(f"📊 Severity assessed: {severity}")
             
             # Send email alert if enabled and severity is HIGH or CRITICAL
             if self._notifier and severity in ["HIGH", "CRITICAL"]:
-                self._notifier.send_alert(failure, result, severity)
-                log.info("Email alert sent  severity=%s", severity)
+                log.info(f"📧 Triggering email alert (severity: {severity})...")
+                try:
+                    self._notifier.send_alert(failure, result, severity)
+                except Exception as email_err:
+                    log.error(f"❌ Email alert failed: {email_err}")
+            elif severity in ["HIGH", "CRITICAL"] and not self._notifier:
+                log.warning(f"⚠️  {severity} severity detected but email notifications are disabled")
+            else:
+                log.debug(f"ℹ️  Severity {severity} - no email alert needed")
             
             self._print_report(failure, result, severity)
         except Exception as e:
-            log.error("Investigation failed  pod=%s  error=%s", key, e)
+            log.error(f"❌ Investigation failed for {key}: {type(e).__name__}: {e}")
             print(f"  ❌ Investigation failed: {e}")
 
     def _build_server_cmd(self) -> list[str]:
@@ -268,14 +306,19 @@ class Watcher:
 
 
 async def _main() -> None:
+    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
     logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        level=log_level,
         stream=sys.stderr,
         format="%(asctime)s [%(levelname)-5s] %(name)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    
+    log.info(f"🔧 Log level: {log_level}")
+    
     cfg = WatcherConfig()
     if not cfg.enabled:
+        log.warning("⚠️  Watcher is disabled (WATCHER_ENABLED=false)")
         print("Watcher is disabled (WATCHER_ENABLED=false)")
         return
     await Watcher(cfg).run()

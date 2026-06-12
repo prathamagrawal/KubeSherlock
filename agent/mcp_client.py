@@ -53,7 +53,9 @@ class MCPClient:
         Returns:
             JSON string of the tool result.
         """
-        log.debug("mcp_call  tool=%s  args=%s", tool_name, arguments)
+        log.debug(f"🔧 Calling MCP tool: {tool_name}")
+        log.debug(f"   Arguments: {arguments}")
+        
         result = await self._session.call_tool(tool_name, arguments)
 
         if result.content and hasattr(result.content[0], "text"):
@@ -61,7 +63,7 @@ class MCPClient:
         else:
             raw = json.dumps([c.model_dump() for c in result.content])
 
-        log.info("mcp_call done  tool=%s  bytes=%d", tool_name, len(raw))
+        log.debug(f"   ✓ Tool result: {len(raw)} bytes")
         return raw
 
 
@@ -79,6 +81,10 @@ async def run_with_mcp(server_command: list[str], coro_factory,
         Whatever coro_factory returns.
     """
     log_path = stderr_log or "/tmp/kubesherlock_mcp.log"
+    log.info(f"🚀 Starting MCP server")
+    log.info(f"   Command: {' '.join(server_command)}")
+    log.info(f"   Server logs: {log_path}")
+    
     params = StdioServerParameters(
         command=server_command[0],
         args=server_command[1:],
@@ -93,20 +99,30 @@ async def run_with_mcp(server_command: list[str], coro_factory,
             stderr=stderr_file,
         )
 
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        try:
+            async with stdio_client(params) as (read, write):
+                log.debug("   MCP transport established")
+                async with ClientSession(read, write) as session:
+                    log.debug("   Initializing MCP session...")
+                    await session.initialize()
+                    log.debug("   Session initialized")
 
-                tools_result = await session.list_tools()
-                tools = [
-                    {
-                        "name": t.name,
-                        "description": t.description or "",
-                        "input_schema": t.inputSchema,
-                    }
-                    for t in tools_result.tools
-                ]
-                log.info("MCP connected  tools=%d  server_log=%s", len(tools), log_path)
+                    log.debug("   Discovering tools...")
+                    tools_result = await session.list_tools()
+                    tools = [
+                        {
+                            "name": t.name,
+                            "description": t.description or "",
+                            "input_schema": t.inputSchema,
+                        }
+                        for t in tools_result.tools
+                    ]
+                    log.info(f"✅ MCP connected - {len(tools)} tools available")
+                    log.debug(f"   Tools: {', '.join(t['name'] for t in tools)}")
 
-                client = MCPClient(session, tools)
-                return await coro_factory(client)
+                    client = MCPClient(session, tools)
+                    return await coro_factory(client)
+        except Exception as e:
+            log.error(f"❌ Failed to connect to MCP server: {type(e).__name__}: {e}")
+            log.error(f"   Check server logs at: {log_path}")
+            raise

@@ -14,7 +14,7 @@ from dataclasses import asdict
 from dotenv import load_dotenv
 from pathlib import Path
 
-load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent / "config.env")
 
 import k8s_mcp.client as _cm
 _cm.K8sClient._instance = None

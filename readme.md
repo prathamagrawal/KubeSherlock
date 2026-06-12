@@ -68,6 +68,8 @@ kubesherlock/
 # Setup
 ./setup-local.sh
 
+# Edit config.env with your API keys
+
 # Unit tests
 .venv/bin/pytest tests/ -v
 

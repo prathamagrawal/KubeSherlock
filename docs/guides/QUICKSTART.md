@@ -7,7 +7,7 @@
 minikube start
 ```
 
-Then edit `.env`:
+Then edit `config.env`:
 ```
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 ```

@@ -16,7 +16,7 @@ from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
 from pathlib import Path
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent / "config.env")
 
 from .metrics import MetricsCollector
 
