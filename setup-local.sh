@@ -35,6 +35,12 @@ echo ""
 echo "1. Start minikube (if not running):"
 echo "   minikube start"
 echo ""
+# Copy config template to .env if not already present
+if [ ! -f ".env" ]; then
+    echo "📄 Creating .env from config.env template..."
+    cp config.env .env
+fi
+
 echo "2. Edit .env with your API keys:"
 echo "   ANTHROPIC_API_KEY=sk-ant-..."
 echo "   OPENAI_API_KEY=sk-proj-..."

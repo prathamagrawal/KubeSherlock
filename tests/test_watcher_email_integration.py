@@ -72,7 +72,7 @@ def test_email_alert_sent_for_critical_severity():
         assert severity == "CRITICAL"
         
         # Mock the email sending
-        with patch.object(watcher._notifier, '_send_smtp') as mock_send:
+        with patch.object(watcher._notifier, '_send_smtp_multipart') as mock_send:
             watcher._notifier.send_alert(failure, result, severity)
             mock_send.assert_called_once()
 
@@ -109,7 +109,7 @@ def test_email_alert_sent_for_high_severity():
         severity = detect_severity(result, failure)
         assert severity == "HIGH"
         
-        with patch.object(watcher._notifier, '_send_smtp') as mock_send:
+        with patch.object(watcher._notifier, '_send_smtp_multipart') as mock_send:
             watcher._notifier.send_alert(failure, result, severity)
             mock_send.assert_called_once()
 
@@ -147,7 +147,7 @@ def test_email_alert_not_sent_for_medium_severity():
         assert severity == "MEDIUM"
         
         # No email should be sent for MEDIUM
-        with patch.object(watcher._notifier, '_send_smtp') as mock_send:
+        with patch.object(watcher._notifier, '_send_smtp_multipart') as mock_send:
             # Simulate the check in _maybe_investigate
             if severity in ["HIGH", "CRITICAL"]:
                 watcher._notifier.send_alert(failure, result, severity)
