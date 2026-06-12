@@ -172,6 +172,30 @@ class Watcher:
             return PodFailure(namespace, pod.name, f"HighRestarts({pod.restart_count})",
                               pod.restart_count)
 
+        # Check container waiting states (ImagePullBackOff, CrashLoopBackOff, etc.)
+        # Need to fetch full pod details to check container states
+        try:
+            from k8s_mcp.tools import PodsTool
+            from k8s_mcp.client import K8sClient
+            from k8s_mcp.security import SecurityContext
+            
+            k8s = K8sClient()
+            security = SecurityContext(allowed_namespaces=[namespace])
+            pods_tool = PodsTool(k8s, security)
+            
+            # Get full pod to check container states
+            full_pod = k8s.core.read_namespaced_pod(pod.name, namespace)
+            
+            # Check container statuses for waiting states
+            if full_pod.status.container_statuses:
+                for cs in full_pod.status.container_statuses:
+                    if cs.state and cs.state.waiting:
+                        reason = cs.state.waiting.reason
+                        if reason in FAILURE_REASONS:
+                            return PodFailure(namespace, pod.name, reason, pod.restart_count)
+        except Exception as e:
+            log.debug("Could not check container states for %s: %s", pod.name, e)
+
         return None
 
     async def _maybe_investigate(self, failure: PodFailure, mcp_client) -> None:

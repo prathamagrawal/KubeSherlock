@@ -78,9 +78,10 @@ def _init(allowed_namespaces: list[str], destructive: bool) -> None:
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
-def list_pods(namespace: str) -> list[dict]:
+def list_pods(namespace: str) -> str:
     """List pods in a namespace with status and restart counts."""
-    return [asdict(p) for p in _pods.list_pods(namespace)]
+    import json
+    return json.dumps([asdict(p) for p in _pods.list_pods(namespace)])
 
 @mcp.tool()
 def describe_pod(namespace: str, pod_name: str) -> dict:
