@@ -82,6 +82,7 @@ python -m agent <question> \
 | `WATCHER_LLM_PROVIDER` | `anthropic` | Which LLM for auto-investigations |
 | `WATCHER_RESTART_THRESHOLD` | `3` | Restart count to trigger investigation |
 | `WATCHER_COOLDOWN` | `300` | Seconds before re-investigating same pod |
+| `WATCHER_EMAIL_ENABLED` | `false` | Enable email alerts for HIGH/CRITICAL |
 
 Example:
 ```
@@ -91,7 +92,35 @@ WATCHER_NAMESPACES=default,prod
 WATCHER_RESTART_THRESHOLD=2
 WATCHER_COOLDOWN=60
 WATCHER_LLM_PROVIDER=anthropic
+WATCHER_EMAIL_ENABLED=true
 ```
+
+---
+
+## Email Notifications
+
+| Variable | Default | Description |
+|---|---|---|
+| `SMTP_HOST` | `smtp.gmail.com` | SMTP server hostname |
+| `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_USE_TLS` | `true` | Enable TLS encryption |
+| `SMTP_USER` | (required) | SMTP username |
+| `SMTP_PASSWORD` | (required) | SMTP password or app password |
+| `SMTP_FROM` | (SMTP_USER) | From address |
+| `ALERT_EMAIL_TO` | (required) | Comma-separated recipient list |
+
+Example:
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USE_TLS=true
+SMTP_USER=alerts@company.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=kubesherlock@company.com
+ALERT_EMAIL_TO=oncall@company.com,devops@company.com
+```
+
+See [docs/EMAIL_ALERTS.md](../EMAIL_ALERTS.md) for detailed setup guide.
 
 ---
 
@@ -120,4 +149,14 @@ WATCHER_NAMESPACES=default,kube-system
 WATCHER_RESTART_THRESHOLD=3
 WATCHER_COOLDOWN=300
 WATCHER_LLM_PROVIDER=anthropic
+WATCHER_EMAIL_ENABLED=true
+
+# Email Notifications (optional)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USE_TLS=true
+SMTP_USER=alerts@company.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=kubesherlock@company.com
+ALERT_EMAIL_TO=oncall@company.com,devops@company.com
 ```
