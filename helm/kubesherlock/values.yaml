@@ -1,0 +1,77 @@
+image:
+  repository: kubesherlock/kubesherlock
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+serviceAccount:
+  create: true
+  name: kubesherlock
+
+rbac:
+  create: true
+
+config:
+  # Watcher settings
+  watcherEnabled: true
+  watcherPollInterval: 60
+  watcherRestartThreshold: 3
+  watcherCooldown: 300
+  
+  # LLM provider (anthropic or openai)
+  llmProvider: anthropic
+  
+  # Namespace monitoring (empty = all namespaces)
+  allowedNamespaces: []
+  
+  # Logging
+  logLevel: INFO
+  
+  # Email alerts
+  emailEnabled: false
+
+# Secrets (create these externally)
+secrets:
+  # API keys - required
+  anthropicApiKey: ""  # Or use existingSecret
+  openaiApiKey: ""     # Or use existingSecret
+  
+  # SMTP - optional, for email alerts
+  smtpUser: ""
+  smtpPassword: ""
+  
+  # Use existing secret instead of creating new one
+  existingSecret: ""
+
+# Email configuration (when emailEnabled: true)
+email:
+  smtpHost: smtp.gmail.com
+  smtpPort: 587
+  smtpUseTls: true
+  smtpFrom: ""
+  alertEmailTo: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

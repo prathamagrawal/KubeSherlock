@@ -1,0 +1,14 @@
+apiVersion: v2
+name: kubesherlock
+description: AI-powered Kubernetes incident investigation agent
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - kubernetes
+  - ai
+  - debugging
+  - monitoring
+  - incident-response
+maintainers:
+  - name: KubeSherlock Contributors

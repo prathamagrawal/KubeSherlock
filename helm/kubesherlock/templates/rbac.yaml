@@ -1,0 +1,49 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-kubesherlock
+  labels:
+    app.kubernetes.io/name: kubesherlock
+    app.kubernetes.io/instance: {{ .Release.Name }}
+rules:
+- apiGroups: [""]
+  resources:
+  - pods
+  - pods/log
+  - events
+  - nodes
+  - persistentvolumeclaims
+  - services
+  - endpoints
+  - configmaps
+  - resourcequotas
+  - limitranges
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources:
+  - deployments
+  - statefulsets
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources:
+  - pods
+  - nodes
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-kubesherlock
+  labels:
+    app.kubernetes.io/name: kubesherlock
+    app.kubernetes.io/instance: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-kubesherlock
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.serviceAccount.name }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

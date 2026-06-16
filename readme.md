@@ -8,23 +8,40 @@ Automatically detects pod failures and generates root-cause analysis reports usi
 
 ## Quick Start
 
+### Option 1: Local Development
 ```bash
 ./setup-local.sh
 minikube start
 python -m agent "Why is my pod crashing?" --namespaces default
 ```
 
-See [docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md) for details.
+### Option 2: Docker
+```bash
+docker run -v ~/.kube/config:/home/kubesherlock/.kube/config:ro \
+  -e ANTHROPIC_API_KEY=sk-ant-your-key \
+  kubesherlock/kubesherlock:latest
+```
+
+### Option 3: Kubernetes (Helm)
+```bash
+kubectl create secret generic kubesherlock-secrets \
+  --from-literal=ANTHROPIC_API_KEY=sk-ant-your-key
+
+helm install kubesherlock ./helm/kubesherlock \
+  --set secrets.existingSecret=kubesherlock-secrets
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for complete installation guides.
 
 ---
 
 ## Features
 
-- **K8s Abstraction Layer** — 26+ tools via MCP
+- **K8s Abstraction Layer** — 20 diagnostic + 6 remediation tools via MCP
 - **AI Investigation Agent** — Anthropic + OpenAI support
 - **Continuous Watcher** — Auto-detects and investigates failures
-- **Security** — Namespace isolation, secret redaction
-- **Destructive Actions** — Restart, delete, scale pods (gated)
+- **Security** — Namespace isolation, secret redaction, destructive action gating
+- **Email Alerts** — Notifications for HIGH/CRITICAL severity failures
 
 ---
 
@@ -32,11 +49,13 @@ See [docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md) for details.
 
 | Document | Purpose |
 |---|---|
+| [DEPLOYMENT](DEPLOYMENT.md) | Installation options (pip, Docker, Helm) |
 | [QUICKSTART](docs/guides/QUICKSTART.md) | Local setup and first test |
 | [TESTING](docs/guides/TESTING.md) | Complete test suite guide |
 | [Architecture](docs/architecture/OVERVIEW.md) | System design and components |
 | [API Reference](docs/reference/API.md) | Tool definitions and schemas |
 | [Configuration](docs/reference/CONFIGURATION.md) | Environment variables |
+| [Email Alerts](docs/EMAIL_ALERTS.md) | Email notification setup |
 
 ---
 

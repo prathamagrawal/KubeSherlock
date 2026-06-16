@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-kubesherlock
+  labels:
+    app.kubernetes.io/name: kubesherlock
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  WATCHER_ENABLED: {{ .Values.config.watcherEnabled | quote }}
+  WATCHER_POLL_INTERVAL: {{ .Values.config.watcherPollInterval | quote }}
+  WATCHER_RESTART_THRESHOLD: {{ .Values.config.watcherRestartThreshold | quote }}
+  WATCHER_COOLDOWN: {{ .Values.config.watcherCooldown | quote }}
+  WATCHER_LLM_PROVIDER: {{ .Values.config.llmProvider | quote }}
+  {{- if .Values.config.allowedNamespaces }}
+  ALLOWED_NAMESPACES: {{ join "," .Values.config.allowedNamespaces | quote }}
+  WATCHER_NAMESPACES: {{ join "," .Values.config.allowedNamespaces | quote }}
+  {{- end }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  WATCHER_EMAIL_ENABLED: {{ .Values.config.emailEnabled | quote }}
+  {{- if .Values.config.emailEnabled }}
+  SMTP_HOST: {{ .Values.email.smtpHost | quote }}
+  SMTP_PORT: {{ .Values.email.smtpPort | quote }}
+  SMTP_USE_TLS: {{ .Values.email.smtpUseTls | quote }}
+  SMTP_FROM: {{ .Values.email.smtpFrom | quote }}
+  ALERT_EMAIL_TO: {{ .Values.email.alertEmailTo | quote }}
+  {{- end }}
