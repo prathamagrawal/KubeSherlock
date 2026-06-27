@@ -1,0 +1,268 @@
+2026-06-27 17:12:51 [INFO ] __main__ - 🔧 Log level: INFO
+2026-06-27 17:12:51 [INFO ] __main__ - 🚀 Initializing KubeSherlock Watcher
+2026-06-27 17:12:51 [INFO ] __main__ -    Provider: openai
+2026-06-27 17:12:51 [INFO ] __main__ -    Namespaces: ['default', 'db']
+2026-06-27 17:12:51 [INFO ] __main__ -    Poll interval: 60s
+2026-06-27 17:12:51 [INFO ] __main__ -    Restart threshold: 3
+2026-06-27 17:12:51 [INFO ] __main__ -    Cooldown: 300s
+2026-06-27 17:12:51 [INFO ] __main__ - 📧 Email notifications ENABLED - setting up...
+2026-06-27 17:12:51 [INFO ] __main__ - ✅ Email notifications configured successfully
+2026-06-27 17:12:51 [INFO ] __main__ -    Recipients: prathamagrawal1205@gmail.com
+2026-06-27 17:12:51 [INFO ] __main__ -    SMTP: smtp.gmail.com:587
+2026-06-27 17:12:51 [INFO ] __main__ - Watcher started  namespaces=['default', 'db']  interval=60s  provider=openai  restart_threshold=3  cooldown=300s
+2026-06-27 17:12:51 [INFO ] agent.mcp_client - 🚀 Starting MCP server
+2026-06-27 17:12:51 [INFO ] agent.mcp_client -    Command: /usr/local/bin/python -m k8s_mcp.server --namespaces default db
+2026-06-27 17:12:51 [INFO ] agent.mcp_client -    Server logs: /tmp/kubesherlock_mcp.log
+
+👁  KubeSherlock Watcher running
+   Namespaces   : ['default', 'db']
+   Poll interval: 60s
+   Provider     : openai
+   Cooldown     : 300s
+   Press Ctrl+C to stop
+
+2026-06-27 17:12:53 [INFO ] k8s_mcp.server - Destructive tools NOT registered (DESTRUCTIVE_ACTIONS_ENABLED=false)
+2026-06-27 17:12:53 [INFO ] k8s_mcp.server - Initialising k8s_mcp  allowed_namespaces=['default', 'db']  destructive=False
+2026-06-27 17:12:53 [INFO ] k8s_mcp.client - Loaded in-cluster kubeconfig
+2026-06-27 17:12:53 [INFO ] k8s_mcp.server - k8s_mcp ready  tools=13
+2026-06-27 17:12:53 [INFO ] mcp.server.lowlevel.server - Processing request of type ListToolsRequest
+2026-06-27 17:12:53 [INFO ] agent.mcp_client - ✅ MCP connected - 20 tools available
+2026-06-27 17:12:54 [INFO ] k8s_mcp.client - Loaded in-cluster kubeconfig
+2026-06-27 17:12:54 [INFO ] k8s_mcp.tools.pods - list_pods  namespace=default  count=3
+2026-06-27 17:12:54 [INFO ] k8s_mcp.tools.pods - list_pods  namespace=db  count=7
+2026-06-27 17:12:54 [INFO ] __main__ - ⚠️  Poll complete — 4 failure(s) detected
+2026-06-27 17:12:54 [INFO ] __main__ - 🔍 Auto-investigation triggered for db/postgres-nodes-0 (reason: HighRestarts(6))
+
+[17:12:54] ⚠️  4 failure(s) detected:
+  • db/postgres-nodes-0 reason=HighRestarts(6) restarts=6
+  • db/postgres-nodes-1 reason=HighRestarts(6) restarts=6
+  • db/postgres-nodes-2 reason=HighRestarts(5) restarts=5
+  • db/postgres-nodes-3 reason=HighRestarts(6) restarts=6
+
+  🔍 Investigating db/postgres-nodes-0 (HighRestarts(6))...
+2026-06-27 17:12:55 [INFO ] agent.investigator - 🔍 Investigation started
+2026-06-27 17:12:55 [INFO ] agent.investigator -    Provider: openai
+2026-06-27 17:12:55 [INFO ] agent.investigator -    Question: Why is pod postgres-nodes-0 failing in namespace db? Detected: HighRestarts(6). Restart count: 6. Investigate and provide root cause and recommendations.
+2026-06-27 17:12:55 [INFO ] agent.investigator -    Max iterations: 5
+2026-06-27 17:12:55 [INFO ] agent.investigator - 🔄 ReAct iteration 1/5
+2026-06-27 17:12:57 [INFO ] httpx - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-27 17:12:57 [INFO ] agent.investigator - 🔧 Tool call: summarize_pod_health
+2026-06-27 17:12:57 [INFO ] mcp.server.lowlevel.server - Processing request of type CallToolRequest
+2026-06-27 17:12:57 [INFO ] k8s_mcp.tools.summary - summarize_pod_health  namespace=db  pod=postgres-nodes-0
+2026-06-27 17:12:58 [INFO ] k8s_mcp.tools.pods - describe_pod  namespace=db  pod=postgres-nodes-0  status=Running  restarts=6
+2026-06-27 17:12:58 [INFO ] k8s_mcp.tools.logs - get_pod_logs  namespace=db  pod=postgres-nodes-0  container=initdb  previous=False  bytes=38
+2026-06-27 17:12:58 [INFO ] k8s_mcp.tools.events - get_events  namespace=db  warnings_only=True  count=33
+2026-06-27 17:12:58 [INFO ] k8s_mcp.tools.nodes - describe_node  node=minikube  ready=True  schedulable=True  pressures=[]
+2026-06-27 17:12:58 [INFO ] k8s_mcp.tools.storage - list_pvcs  namespace=db  count=5  unbound=0
+2026-06-27 17:12:58 [INFO ] k8s_mcp.tools.quota - list_resource_quotas  namespace=db  count=0  near_limit=[]
+2026-06-27 17:12:58 [INFO ] k8s_mcp.tools.workloads - list_statefulsets  namespace=db  count=1  degraded=0
+2026-06-27 17:12:58 [INFO ] k8s_mcp.tools.metrics - get_pod_metrics  namespace=db  count=7
+2026-06-27 17:12:58 [INFO ] k8s_mcp.tools.summary - summarize_pod_health complete  namespace=db  pod=postgres-nodes-0  causes=['High restart count (6) — likely repeated application crash', 'Scheduling failure: 0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. not found', 'Kubernetes BackOff: container start being throttled due to repeated failures']
+2026-06-27 17:12:58 [INFO ] agent.investigator - 🔄 ReAct iteration 2/5
+2026-06-27 17:13:01 [INFO ] httpx - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-27 17:13:01 [INFO ] agent.investigator - ✅ Investigation complete!
+2026-06-27 17:13:01 [INFO ] agent.investigator -    Iterations: 2
+2026-06-27 17:13:01 [INFO ] agent.investigator -    Tool calls: 1
+2026-06-27 17:13:01 [INFO ] agent.investigator -    Duration: 6.15s
+2026-06-27 17:13:01 [INFO ] __main__ - ✅ Investigation completed - 2 iterations, 1 tool calls
+2026-06-27 17:13:01 [INFO ] __main__ - 📊 Severity assessed: MEDIUM
+
+  ────────────────────────────────────────────────────────
+  📋 Investigation report: db/postgres-nodes-0
+  Severity: MEDIUM  |  Iterations: 2  |  Tools used: 1
+    → summarize_pod_health
+
+**Summary:** The `postgres-nodes-0` pod in the `db` namespace is experiencing high restarts due to readiness and liveness probe failures, along with scheduling issues related to unbound PersistentVolumeClaims.
+
+**Evidence:**
+- The `postgres` container has restarted 4 times due to liveness and readiness probe failures.
+- Warning events indicate:
+  - A `FailedScheduling` event due to "pod has unbound immediate PersistentVolumeClaims".
+  - Multiple `BackOff` events with 7 occurrences, indicating Kubernetes is throttling the restart of the failed `postgres` container.
+  - Probes failed with timeouts when checking PostgreSQL readiness and liveness, leading to the restarts.
+- Recent logs indicate normal messages like "Node already initialized, skipping...", but no errors are shown.
+- The node is ready and has no pressures, suggesting this is not a node resource issue.
+
+**Root Cause:** The pod is failing primarily due to readiness and liveness probe failures, which are likely related to connectivity or service dependency issues, causing the `postgres` container to repeatedly restart. Additionally, the unbound PersistentVolumeClaims have caused scheduling issues, though the PVC issue appears resolved now.
+
+**Recommendations:**
+1. **Immediate action:** 
+   - Investigate and address connectivity issues or configuration errors that cause readiness and liveness probe failures. Ensure the PostgreSQL service starts correctly and is accessible as expected.
+2. **Follow-up action:**
+   - Review and, if necessary, adjust PersistentVolumeClaim configurations to prevent scheduling problems in the future.
+   - Monitor probe configurations to ensure they align with the actual service start times and functionalities, preventing premature failures.
+
+  ────────────────────────────────────────────────────────
+
+
+  🔍 Investigating db/postgres-nodes-1 (HighRestarts(6))...
+2026-06-27 17:13:01 [INFO ] __main__ - 🔍 Auto-investigation triggered for db/postgres-nodes-1 (reason: HighRestarts(6))
+2026-06-27 17:13:01 [INFO ] agent.investigator - 🔍 Investigation started
+2026-06-27 17:13:01 [INFO ] agent.investigator -    Provider: openai
+2026-06-27 17:13:01 [INFO ] agent.investigator -    Question: Why is pod postgres-nodes-1 failing in namespace db? Detected: HighRestarts(6). Restart count: 6. Investigate and provide root cause and recommendations.
+2026-06-27 17:13:01 [INFO ] agent.investigator -    Max iterations: 5
+2026-06-27 17:13:01 [INFO ] agent.investigator - 🔄 ReAct iteration 1/5
+2026-06-27 17:13:03 [INFO ] httpx - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-27 17:13:03 [INFO ] agent.investigator - 🔧 Tool call: summarize_pod_health
+2026-06-27 17:13:03 [INFO ] mcp.server.lowlevel.server - Processing request of type CallToolRequest
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.summary - summarize_pod_health  namespace=db  pod=postgres-nodes-1
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.pods - describe_pod  namespace=db  pod=postgres-nodes-1  status=Running  restarts=6
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.logs - get_pod_logs  namespace=db  pod=postgres-nodes-1  container=initdb  previous=False  bytes=38
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.events - get_events  namespace=db  warnings_only=True  count=33
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.nodes - describe_node  node=minikube  ready=True  schedulable=True  pressures=[]
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.storage - list_pvcs  namespace=db  count=5  unbound=0
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.quota - list_resource_quotas  namespace=db  count=0  near_limit=[]
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.workloads - list_statefulsets  namespace=db  count=1  degraded=0
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.metrics - get_pod_metrics  namespace=db  count=7
+2026-06-27 17:13:03 [INFO ] k8s_mcp.tools.summary - summarize_pod_health complete  namespace=db  pod=postgres-nodes-1  causes=['High restart count (6) — likely repeated application crash', 'Scheduling failure: 0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. not found', 'Kubernetes BackOff: container start being throttled due to repeated failures']
+2026-06-27 17:13:03 [INFO ] agent.investigator - 🔄 ReAct iteration 2/5
+2026-06-27 17:13:07 [INFO ] httpx - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-27 17:13:07 [INFO ] agent.investigator - ✅ Investigation complete!
+2026-06-27 17:13:07 [INFO ] agent.investigator -    Iterations: 2
+2026-06-27 17:13:07 [INFO ] agent.investigator -    Tool calls: 1
+2026-06-27 17:13:07 [INFO ] agent.investigator -    Duration: 5.66s
+2026-06-27 17:13:07 [INFO ] __main__ - ✅ Investigation completed - 2 iterations, 1 tool calls
+2026-06-27 17:13:07 [INFO ] __main__ - 📊 Severity assessed: MEDIUM
+
+  ────────────────────────────────────────────────────────
+  📋 Investigation report: db/postgres-nodes-1
+  Severity: MEDIUM  |  Iterations: 2  |  Tools used: 1
+    → summarize_pod_health
+
+**Summary:** The pod `postgres-nodes-1` in namespace `db` is experiencing high restart counts due to repeated application crashes and possible volume binding issues.
+
+**Evidence:**
+- The `postgres` container has restarted 4 times. 
+- Warning events include multiple instances of `FailedScheduling` due to "pod has unbound immediate PersistentVolumeClaims. not found."
+- Readiness and liveness probes are failing, with errors such as "localhost:5432 - no response" and timeout errors with the postgres readiness check.
+- There are `BackOff` events indicating the container restart is being throttled due to repeated failures.
+- A `FailedSync` error was reported citing a connection reset, and there are docker connectivity issues mentioned in health events.
+- PVC issues were mentioned in scheduling failures, though no current PVC issues were flagged.
+- The node `minikube` is ready with no pressure or quota issues indicated.
+
+**Root Cause:** The root cause appears to be a combination of unbound PersistentVolumeClaims preventing scheduling and readiness/liveness probe failures leading to container crashes. Connectivity issues with the Docker daemon or misconfiguration may contribute to these failures.
+
+**Recommendations:**
+1. **Immediate Action:** 
+   - Verify and ensure that PersistentVolumeClaims are correctly defined, bound, and available for the pod since the "unbound immediate PVCs" error prevents scheduling.
+   - Check the configuration and logs of the PostgreSQL process to resolve readiness and liveness probe issues. Ensure the application is correctly listening on the expected ports.
+  
+2. **Follow-up Action:**
+   - Investigate Docker or CRI runtime connectivity issues, as indicated by the failed probe health events, and ensure the Docker daemon is functioning correctly.
+   - Consider implementing more robust logging within the PostgreSQL container to capture crash details more effectively for future incidents.
+
+  ────────────────────────────────────────────────────────
+
+2026-06-27 17:13:07 [INFO ] __main__ - 🔍 Auto-investigation triggered for db/postgres-nodes-2 (reason: HighRestarts(5))
+
+  🔍 Investigating db/postgres-nodes-2 (HighRestarts(5))...
+2026-06-27 17:13:07 [INFO ] agent.investigator - 🔍 Investigation started
+2026-06-27 17:13:07 [INFO ] agent.investigator -    Provider: openai
+2026-06-27 17:13:07 [INFO ] agent.investigator -    Question: Why is pod postgres-nodes-2 failing in namespace db? Detected: HighRestarts(5). Restart count: 5. Investigate and provide root cause and recommendations.
+2026-06-27 17:13:07 [INFO ] agent.investigator -    Max iterations: 5
+2026-06-27 17:13:07 [INFO ] agent.investigator - 🔄 ReAct iteration 1/5
+2026-06-27 17:13:09 [INFO ] httpx - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-27 17:13:09 [INFO ] agent.investigator - 🔧 Tool call: summarize_pod_health
+2026-06-27 17:13:09 [INFO ] mcp.server.lowlevel.server - Processing request of type CallToolRequest
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.summary - summarize_pod_health  namespace=db  pod=postgres-nodes-2
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.pods - describe_pod  namespace=db  pod=postgres-nodes-2  status=Running  restarts=5
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.logs - get_pod_logs  namespace=db  pod=postgres-nodes-2  container=initdb  previous=False  bytes=38
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.events - get_events  namespace=db  warnings_only=True  count=33
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.nodes - describe_node  node=minikube  ready=True  schedulable=True  pressures=[]
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.storage - list_pvcs  namespace=db  count=5  unbound=0
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.quota - list_resource_quotas  namespace=db  count=0  near_limit=[]
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.workloads - list_statefulsets  namespace=db  count=1  degraded=0
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.metrics - get_pod_metrics  namespace=db  count=7
+2026-06-27 17:13:09 [INFO ] k8s_mcp.tools.summary - summarize_pod_health complete  namespace=db  pod=postgres-nodes-2  causes=['High restart count (5) — likely repeated application crash', 'Scheduling failure: 0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. not found', 'Kubernetes BackOff: container start being throttled due to repeated failures']
+2026-06-27 17:13:09 [INFO ] agent.investigator - 🔄 ReAct iteration 2/5
+2026-06-27 17:13:12 [INFO ] httpx - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-27 17:13:12 [INFO ] agent.investigator - ✅ Investigation complete!
+2026-06-27 17:13:12 [INFO ] agent.investigator -    Iterations: 2
+2026-06-27 17:13:12 [INFO ] agent.investigator -    Tool calls: 1
+2026-06-27 17:13:12 [INFO ] agent.investigator -    Duration: 5.20s
+2026-06-27 17:13:12 [INFO ] __main__ - ✅ Investigation completed - 2 iterations, 1 tool calls
+2026-06-27 17:13:12 [INFO ] __main__ - 📊 Severity assessed: MEDIUM
+
+  ────────────────────────────────────────────────────────
+  📋 Investigation report: db/postgres-nodes-2
+  Severity: MEDIUM  |  Iterations: 2  |  Tools used: 1
+    → summarize_pod_health
+
+**Summary:** The `postgres-nodes-2` pod in the `db` namespace is experiencing repeated restarts (5) due to probable application crashes, and there are several issues related to pod scheduling and health probes.
+
+**Evidence:**
+- The `postgres` container has restarted 4 times, while the `initdb` container has restarted once and completed successfully.
+- Warning events indicate failed scheduling due to an unbound PersistentVolumeClaim and issues with readiness and liveness probes.
+- Specific warning messages include:
+  - Scheduling failure: "0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. not found."
+  - Readiness and liveness probe errors, indicating issues with container startup and health checks.
+  - Back-off messages indicating throttled restarts of the `postgres` container.
+- Logs from the pod indicate "Node already initialized, skipping...", suggesting the issue is not with initialization.
+
+**Root Cause:** The most likely root cause is a persistent volume claim issue, leading to failed container scheduling and health check errors that cause the pod to restart. Additionally, there might be connectivity issues or missing Docker daemon services associated with the probe failures.
+
+**Recommendations:**
+1. **Immediate Action:** Verify and correct any unbound PersistentVolumeClaims. Ensure that all PVCs required by the `postgres-nodes-2` pod are correctly bound and available.
+2. **Follow-up Action:** Investigate the application's health probe configurations and errors. Verify connectivity and correctness. Ensure that the Docker daemon is operational or that any container-specific dependencies are satisfied.
+
+  ────────────────────────────────────────────────────────
+
+
+  🔍 Investigating db/postgres-nodes-3 (HighRestarts(6))...
+2026-06-27 17:13:12 [INFO ] __main__ - 🔍 Auto-investigation triggered for db/postgres-nodes-3 (reason: HighRestarts(6))
+2026-06-27 17:13:12 [INFO ] agent.investigator - 🔍 Investigation started
+2026-06-27 17:13:12 [INFO ] agent.investigator -    Provider: openai
+2026-06-27 17:13:12 [INFO ] agent.investigator -    Question: Why is pod postgres-nodes-3 failing in namespace db? Detected: HighRestarts(6). Restart count: 6. Investigate and provide root cause and recommendations.
+2026-06-27 17:13:12 [INFO ] agent.investigator -    Max iterations: 5
+2026-06-27 17:13:12 [INFO ] agent.investigator - 🔄 ReAct iteration 1/5
+2026-06-27 17:13:14 [INFO ] httpx - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-27 17:13:14 [INFO ] agent.investigator - 🔧 Tool call: summarize_pod_health
+2026-06-27 17:13:14 [INFO ] mcp.server.lowlevel.server - Processing request of type CallToolRequest
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.summary - summarize_pod_health  namespace=db  pod=postgres-nodes-3
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.pods - describe_pod  namespace=db  pod=postgres-nodes-3  status=Running  restarts=6
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.logs - get_pod_logs  namespace=db  pod=postgres-nodes-3  container=initdb  previous=False  bytes=38
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.events - get_events  namespace=db  warnings_only=True  count=33
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.nodes - describe_node  node=minikube  ready=True  schedulable=True  pressures=[]
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.storage - list_pvcs  namespace=db  count=5  unbound=0
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.quota - list_resource_quotas  namespace=db  count=0  near_limit=[]
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.workloads - list_statefulsets  namespace=db  count=1  degraded=0
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.metrics - get_pod_metrics  namespace=db  count=7
+2026-06-27 17:13:14 [INFO ] k8s_mcp.tools.summary - summarize_pod_health complete  namespace=db  pod=postgres-nodes-3  causes=['High restart count (6) — likely repeated application crash', 'Scheduling failure: 0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. not found', 'Kubernetes BackOff: container start being throttled due to repeated failures']
+2026-06-27 17:13:14 [INFO ] agent.investigator - 🔄 ReAct iteration 2/5
+2026-06-27 17:13:19 [INFO ] httpx - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-27 17:13:19 [INFO ] agent.investigator - ✅ Investigation complete!
+2026-06-27 17:13:19 [INFO ] agent.investigator -    Iterations: 2
+2026-06-27 17:13:19 [INFO ] agent.investigator -    Tool calls: 1
+2026-06-27 17:13:19 [INFO ] agent.investigator -    Duration: 6.33s
+2026-06-27 17:13:19 [INFO ] __main__ - ✅ Investigation completed - 2 iterations, 1 tool calls
+2026-06-27 17:13:19 [INFO ] __main__ - 📊 Severity assessed: MEDIUM
+
+  ────────────────────────────────────────────────────────
+  📋 Investigation report: db/postgres-nodes-3
+  Severity: MEDIUM  |  Iterations: 2  |  Tools used: 1
+    → summarize_pod_health
+
+**Summary:** The `postgres-nodes-3` pod in the `db` namespace is experiencing high restart counts due to repeated crashes, linked with issues related to unbound PersistentVolumeClaims and health probes.
+
+**Evidence:**
+- The pod has a total restart count of 6; the `postgres` container has restarted 4 times, and the `pod-labeler` container has restarted 2 times.
+- The `initdb` container has successfully completed its task, indicating it is not the source of ongoing problems.
+- Warning events include:
+  - A `FailedScheduling` event due to "pod has unbound immediate PersistentVolumeClaims".
+  - A `BackOff` event indicating a back-off for restarting the `postgres` container continues to fail.
+  - Readiness probe errors contributing to the container's state being unknown.
+- Recent logs mention "Node already initialized, skipping..." suggesting that part of the initialization logic is prematurely considered complete or redundant.
+- Resource quotas and node pressures are not the immediate issues, nor are PVC issues listed aside from the initial scheduling failure.
+- Probable causes highlighted by the summary:
+  - High restart count suggesting repeated application crashes.
+  - Unbound PVC causing scheduling issues.
+  - Backoff throttling due to repeated container failures.
+
+**Root Cause:** The root cause appears to be the repeated failure of the `postgres` container, possibly due to configuration or code errors leading to crashes. Additionally, there are scheduling issues linked to the pod's PVCs not being bound, potentially affecting the pod's ability to maintain stable operation.
+
+**Recommendations:**
+1. **Immediate action**: Investigate and correct any misconfigurations in the pod's PVC setup to resolve the `FailedScheduling` issues and ensure all required volumes are correctly bound.
+2. **Follow-up action**: Analyze the application code or configuration causing the `postgres` container to crash and correct the errors. A review and improvement of health/readiness probes can also prevent the false-positive errors seen with readiness checks.
+
+  ────────────────────────────────────────────────────────
+

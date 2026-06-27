@@ -1,5 +1,5 @@
 image:
-  repository: kubesherlock/kubesherlock
+  repository: prathamagrawal/kubesherlock
   tag: "1.0.0"
   pullPolicy: IfNotPresent
 
@@ -18,39 +18,36 @@ config:
   watcherPollInterval: 60
   watcherRestartThreshold: 3
   watcherCooldown: 300
-  
+
   # LLM provider (anthropic or openai)
-  llmProvider: anthropic
-  
+  llmProvider: openai
+
   # Namespace monitoring (empty = all namespaces)
-  allowedNamespaces: []
-  
+  allowedNamespaces: ["default", "db"]
+
   # Logging
   logLevel: INFO
-  
+
   # Email alerts
-  emailEnabled: false
+  emailEnabled: true
 
-# Secrets (create these externally)
+# Secrets — set existingSecret to use a pre-created k8s secret (recommended)
+# Or set anthropicApiKey / openaiApiKey directly (not recommended for production)
 secrets:
-  # API keys - required
-  anthropicApiKey: ""  # Or use existingSecret
-  openaiApiKey: ""     # Or use existingSecret
-  
-  # SMTP - optional, for email alerts
-  smtpUser: ""
-  smtpPassword: ""
-  
-  # Use existing secret instead of creating new one
-  existingSecret: ""
+  anthropicApiKey: ""
+  openaiApiKey: "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"
+  smtpUser: "prathamagrawal1205@gmail.com"
+  smtpPassword: "ddnl thgt pcgz mean"
+  # Name of an existing secret containing API keys
+  existingSecret: "kubesherlock-secrets"
 
-# Email configuration (when emailEnabled: true)
+# Email configuration (used when config.emailEnabled: true)
 email:
   smtpHost: smtp.gmail.com
   smtpPort: 587
   smtpUseTls: true
-  smtpFrom: ""
-  alertEmailTo: ""
+  smtpFrom: "prathamagrawal1205@gmail.com"
+  alertEmailTo: "prathamagrawal1205@gmail.com"
 
 resources:
   limits:
