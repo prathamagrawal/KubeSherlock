@@ -6,6 +6,7 @@ metadata:
     app.kubernetes.io/name: kubesherlock
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
+  # ── Watcher ────────────────────────────────────────────────────────────────
   WATCHER_ENABLED: {{ .Values.config.watcherEnabled | quote }}
   WATCHER_POLL_INTERVAL: {{ .Values.config.watcherPollInterval | quote }}
   WATCHER_RESTART_THRESHOLD: {{ .Values.config.watcherRestartThreshold | quote }}
@@ -16,6 +17,8 @@ data:
   WATCHER_NAMESPACES: {{ join "," .Values.config.allowedNamespaces | quote }}
   {{- end }}
   LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+
+  # ── Email ──────────────────────────────────────────────────────────────────
   WATCHER_EMAIL_ENABLED: {{ .Values.config.emailEnabled | quote }}
   {{- if .Values.config.emailEnabled }}
   SMTP_HOST: {{ .Values.email.smtpHost | quote }}
@@ -23,4 +26,18 @@ data:
   SMTP_USE_TLS: {{ .Values.email.smtpUseTls | quote }}
   SMTP_FROM: {{ .Values.email.smtpFrom | quote }}
   ALERT_EMAIL_TO: {{ .Values.email.alertEmailTo | quote }}
+  {{- end }}
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  {{- if .Values.postgresql.enabled }}
+  DB_HOST: {{ required "postgresql.host is required when postgresql.enabled=true" .Values.postgresql.host | quote }}
+  DB_PORT: {{ .Values.postgresql.port | quote }}
+  DB_NAME: {{ .Values.postgresql.database | quote }}
+  DB_USER: {{ .Values.postgresql.user | quote }}
+  DB_SCHEMA: {{ .Values.postgresql.schema | quote }}
+  {{- end }}
+
+  # ── Prometheus metrics ─────────────────────────────────────────────────────
+  {{- if .Values.metrics.enabled }}
+  METRICS_PORT: {{ .Values.metrics.port | quote }}
   {{- end }}

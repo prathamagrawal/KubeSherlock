@@ -13,35 +13,45 @@ rbac:
   create: true
 
 config:
-  # Watcher settings
+  # ── Watcher ───────────────────────────────────────────────────────────────
   watcherEnabled: true
   watcherPollInterval: 60
   watcherRestartThreshold: 3
   watcherCooldown: 300
 
-  # LLM provider (anthropic or openai)
+  # ── LLM provider ──────────────────────────────────────────────────────────
+  # "openai" or "anthropic"
   llmProvider: openai
 
-  # Namespace monitoring (empty = all namespaces)
+  # ── Namespace monitoring (empty list = all namespaces) ────────────────────
   allowedNamespaces: ["default"]
 
-  # Logging
+  # ── Logging ───────────────────────────────────────────────────────────────
   logLevel: INFO
 
-  # Email alerts
-  emailEnabled: true
+  # ── Email alerts ──────────────────────────────────────────────────────────
+  emailEnabled: false
 
-# Secrets — set existingSecret to use a pre-created k8s secret (recommended)
-# Or set anthropicApiKey / openaiApiKey directly (not recommended for production)
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# Recommended: point existingSecret at a pre-created kubectl secret so that
+# sensitive values are never stored in Helm release history.
+#
+# kubectl create secret generic kubesherlock-secrets \
+#   --from-literal=ANTHROPIC_API_KEY=sk-ant-... \
+#   --from-literal=OPENAI_API_KEY=sk-proj-... \
+#   --from-literal=SMTP_USER=alerts@... \
+#   --from-literal=SMTP_PASSWORD=... \
+#   --from-literal=DB_PASSWORD=...
 secrets:
+  existingSecret: ""      # set this (recommended)
+  # Inline fallback — only used when existingSecret is empty
   anthropicApiKey: ""
   openaiApiKey: ""
   smtpUser: ""
   smtpPassword: ""
-  # Name of an existing secret containing API keys
-  existingSecret: ""
+  dbPassword: ""
 
-# Email configuration (used when config.emailEnabled: true)
+# ── Email ─────────────────────────────────────────────────────────────────────
 email:
   smtpHost: smtp.gmail.com
   smtpPort: 587
@@ -49,6 +59,32 @@ email:
   smtpFrom: ""
   alertEmailTo: ""
 
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+# Set enabled: true to connect the watcher/metrics to a PostgreSQL instance.
+# The chart does NOT deploy PostgreSQL itself — point it at an existing instance
+# (e.g. a cloud managed DB, or your own StatefulSet).
+postgresql:
+  enabled: false
+  host: ""          # e.g. "postgres-svc" or "my-db.rds.amazonaws.com"
+  port: 5432
+  database: kubesherlock
+  user: postgres
+  schema: kubesherlock   # PostgreSQL schema that owns all KubeSherlock tables
+  # password must be supplied via secrets.dbPassword or secrets.existingSecret
+
+# ── Prometheus / Metrics ──────────────────────────────────────────────────────
+# Exposes a /metrics endpoint (Prometheus text format) on a sidecar container.
+metrics:
+  enabled: false
+  port: 8000
+  # Set to true if you have the Prometheus Operator installed.
+  # This creates a ServiceMonitor so Prometheus discovers the target automatically.
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    namespace: ""     # defaults to the release namespace
+
+# ── Resources ─────────────────────────────────────────────────────────────────
 resources:
   limits:
     cpu: 500m
@@ -57,6 +93,15 @@ resources:
     cpu: 100m
     memory: 128Mi
 
+metricsResources:
+  limits:
+    cpu: 100m
+    memory: 64Mi
+  requests:
+    cpu: 50m
+    memory: 32Mi
+
+# ── Security ──────────────────────────────────────────────────────────────────
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
@@ -69,6 +114,7 @@ securityContext:
     - ALL
   readOnlyRootFilesystem: true
 
+# ── Scheduling ────────────────────────────────────────────────────────────────
 nodeSelector: {}
 tolerations: []
 affinity: {}
