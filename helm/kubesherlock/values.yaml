@@ -23,7 +23,7 @@ config:
   llmProvider: openai
 
   # Namespace monitoring (empty = all namespaces)
-  allowedNamespaces: ["default", "db"]
+  allowedNamespaces: ["default"]
 
   # Logging
   logLevel: INFO
@@ -35,19 +35,19 @@ config:
 # Or set anthropicApiKey / openaiApiKey directly (not recommended for production)
 secrets:
   anthropicApiKey: ""
-  openaiApiKey: "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"
-  smtpUser: "prathamagrawal1205@gmail.com"
-  smtpPassword: "ddnl thgt pcgz mean"
+  openaiApiKey: ""
+  smtpUser: ""
+  smtpPassword: ""
   # Name of an existing secret containing API keys
-  existingSecret: "kubesherlock-secrets"
+  existingSecret: ""
 
 # Email configuration (used when config.emailEnabled: true)
 email:
   smtpHost: smtp.gmail.com
   smtpPort: 587
   smtpUseTls: true
-  smtpFrom: "prathamagrawal1205@gmail.com"
-  alertEmailTo: "prathamagrawal1205@gmail.com"
+  smtpFrom: ""
+  alertEmailTo: ""
 
 resources:
   limits:
