@@ -1,0 +1,64 @@
+# =============================================================================
+# KubeSherlock — Failing Pod Manifests for Testing
+# =============================================================================
+# Deploys three different failing pods to test KubeSherlock's ReAct loop,
+# severity classifier, Postgres history, and Prometheus metrics.
+#
+# Deploy:
+#   kubectl apply -f helm/crashing-pods.yaml
+#
+# Inspect:
+#   kubectl get pods -w
+#
+# Teardown:
+#   kubectl delete -f helm/crashing-pods.yaml
+# =============================================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crashing-app-pod
+  namespace: default
+  labels:
+    app: test-crashing
+spec:
+  restartPolicy: Always
+  containers:
+  - name: main
+    image: alpine:latest
+    command: ["sh", "-c", "echo '[INFO] Starting application server...'; sleep 5; echo '[FATAL] Failed to initialize connection pool: timeout'; exit 1"]
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oomkilled-app-pod
+  namespace: default
+  labels:
+    app: test-oom
+spec:
+  restartPolicy: Always
+  containers:
+  - name: main
+    image: alpine:latest
+    # Attempting to allocate 100MB while restricted to 10MB to trigger OOMKilled status
+    command: ["sh", "-c", "echo '[INFO] Initializing memory buffer...'; dd if=/dev/zero of=/dev/stdout bs=100M count=1"]
+    resources:
+      limits:
+        memory: "10Mi"
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: imagepull-app-pod
+  namespace: default
+  labels:
+    app: test-imagepull
+spec:
+  restartPolicy: Always
+  containers:
+  - name: main
+    # Invalid image tag to trigger ImagePullBackOff status
+    image: alpine:does-not-exist-999
+    command: ["sleep", "3600"]

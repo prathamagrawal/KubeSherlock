@@ -5,21 +5,33 @@ database.db
 Minimal async database abstraction layer for investigations and metrics.
 
 Handles connection pooling, investigations CRUD, and metrics storage.
+
+All objects live in the "kubesherlock" PostgreSQL schema (not "public").
+The search_path is pinned at pool-creation time via server_settings so
+every acquired connection is automatically scoped to that schema — no
+per-query schema prefixes needed in the SQL strings.
 """
 
 import json
 import logging
 import os
-from datetime import datetime
 from typing import Any, Optional
 
 import asyncpg
 
 log = logging.getLogger(__name__)
 
+# The dedicated PostgreSQL schema that owns all KubeSherlock objects.
+DEFAULT_SCHEMA = "kubesherlock"
+
 
 class Database:
-    """Async PostgreSQL connection pool wrapper."""
+    """Async PostgreSQL connection pool wrapper.
+
+    All tables are created in the ``kubesherlock`` schema.  The pool is
+    configured with ``search_path = kubesherlock`` so unqualified table
+    names in SQL strings resolve correctly without per-query prefixes.
+    """
 
     _instance: Optional["Database"] = None
     _pool: Optional[asyncpg.Pool] = None
@@ -36,10 +48,24 @@ class Database:
         database: str = "kubesherlock",
         user: str = "postgres",
         password: str = "postgres",
+        schema: str = DEFAULT_SCHEMA,
         min_size: int = 5,
         max_size: int = 20,
     ) -> None:
-        """Initialize connection pool."""
+        """Initialize connection pool.
+
+        Args:
+            host:     PostgreSQL host.
+            port:     PostgreSQL port.
+            database: Database (catalog) name.
+            user:     Database user.
+            password: Database password.
+            schema:   PostgreSQL schema that owns all KubeSherlock tables.
+                      Pinned as search_path on every pool connection so
+                      unqualified table names resolve correctly.
+            min_size: Minimum pool connections.
+            max_size: Maximum pool connections.
+        """
         if self._pool:
             return
         self._pool = await asyncpg.create_pool(
@@ -50,8 +76,14 @@ class Database:
             password=password,
             min_size=min_size,
             max_size=max_size,
+            # Pin search_path so every connection in the pool resolves
+            # unqualified table names to the kubesherlock schema.
+            server_settings={"search_path": schema},
         )
-        log.info("Database connected  pool_size=%d-%d", min_size, max_size)
+        log.info(
+            "Database connected  host=%s db=%s schema=%s pool=%d-%d",
+            host, database, schema, min_size, max_size,
+        )
 
     async def disconnect(self) -> None:
         """Close connection pool."""
@@ -87,7 +119,12 @@ class Database:
         resource_name: Optional[str] = None,
         provider: str = "anthropic",
     ) -> int:
-        """Create a new investigation record. Returns investigation ID."""
+        """Create a new investigation record. Returns investigation ID.
+
+        The ``answer`` column is intentionally omitted here — it is
+        populated later by :meth:`update_investigation` once the LLM
+        finishes (two-phase write pattern).
+        """
         query = """
         INSERT INTO investigations (question, namespace, resource_name, provider, status)
         VALUES ($1, $2, $3, $4, 'in_progress')
@@ -138,7 +175,7 @@ class Database:
 
         updates.append(f"status = ${idx}")
         params.append(status)
-        updates.append(f"updated_at = CURRENT_TIMESTAMP")
+        updates.append("updated_at = CURRENT_TIMESTAMP")
 
         query = f"UPDATE investigations SET {', '.join(updates)} WHERE id = $1"
         async with self._pool.acquire() as conn:
@@ -185,7 +222,7 @@ class Database:
     ) -> None:
         """Record a tool call for an investigation."""
         query = """
-        INSERT INTO investigation_tool_calls 
+        INSERT INTO investigation_tool_calls
         (investigation_id, tool_name, arguments, result_summary, execution_time_ms)
         VALUES ($1, $2, $3, $4, $5)
         """
@@ -208,7 +245,7 @@ class Database:
     ) -> None:
         """Record a finding from an investigation."""
         query = """
-        INSERT INTO investigation_findings 
+        INSERT INTO investigation_findings
         (investigation_id, finding_type, severity, content)
         VALUES ($1, $2, $3, $4)
         """
@@ -257,7 +294,11 @@ class Database:
 
 # Singleton access
 async def get_db() -> Database:
-    """Get or create the database singleton."""
+    """Get or create the database singleton.
+
+    Reads connection config from environment variables:
+        DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_SCHEMA
+    """
     db = Database()
     if db._pool is None:
         await db.connect(
@@ -266,5 +307,6 @@ async def get_db() -> Database:
             database=os.getenv("DB_NAME", "kubesherlock"),
             user=os.getenv("DB_USER", "postgres"),
             password=os.getenv("DB_PASSWORD", "postgres"),
+            schema=os.getenv("DB_SCHEMA", DEFAULT_SCHEMA),
         )
     return db

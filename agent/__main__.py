@@ -53,7 +53,23 @@ async def _run(question: str, namespaces: list[str], destructive: bool,
     async def run_investigation(client):
         print(f"📡 Connected to MCP server — {len(client.tools)} tools available")
         print(f"📋 Server logs: /tmp/kubesherlock_mcp.log\n")
-        investigator = Investigator(mcp_client=client, provider=provider, model=model)
+        
+        memory = None
+        if os.environ.get("DB_HOST"):
+            try:
+                from database.db import get_db
+                from .memory import InvestigationMemory
+                db = await get_db()
+                memory = InvestigationMemory(db)
+            except Exception:
+                pass
+
+        investigator = Investigator(
+            mcp_client=client,
+            provider=provider,
+            model=model,
+            memory=memory,
+        )
         return await investigator.investigate(question)
 
     result = await run_with_mcp(server_cmd, run_investigation)

@@ -1,15 +1,21 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    environment: "local-dev"
 
 scrape_configs:
-  - job_name: 'kubesherlock-agent'
+  # KubeSherlock metrics server (run via: python -m agent.metrics_server)
+  # In docker-compose the agent runs on the host; in k8s it's a sidecar on port 8000.
+  - job_name: "kubesherlock-agent"
     static_configs:
-      - targets: ['localhost:8000']
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          app: "kubesherlock"
     scrape_interval: 10s
+    metrics_path: /metrics
 
-  - job_name: 'kubesherlock-db'
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
     static_configs:
-      - targets: ['localhost:5432']
-    metrics_path: '/metrics'
-    scrape_interval: 30s
+      - targets: ["localhost:9090"]

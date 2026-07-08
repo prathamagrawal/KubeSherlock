@@ -1,0 +1,392 @@
+# =============================================================================
+# KubeSherlock — Test Infrastructure Stack
+# =============================================================================
+# Deploys PostgreSQL (StatefulSet) and Prometheus (Deployment) inside the
+# cluster so you can test the full Helm chart with real backing services.
+#
+# APPLY THIS FIRST, then run helm install with test-values.yaml.
+#
+# Usage:
+#   kubectl apply -f helm/test-stack.yaml
+#   helm install kubesherlock ./helm/kubesherlock -f helm/test-values.yaml
+#
+# Teardown:
+#   helm uninstall kubesherlock
+#   kubectl delete -f helm/test-stack.yaml
+#   kubectl delete pvc postgres-data-kubesherlock-postgres-0   # PVC is not deleted automatically
+#
+# All resources live in the "default" namespace.
+# Change every `namespace: default` below if you want a dedicated namespace.
+# =============================================================================
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. KubeSherlock application secret
+#    Fill in your real API keys before applying.
+#    This is the secret referenced by helm install --set secrets.existingSecret=kubesherlock-secrets
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubesherlock-secrets
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: kubesherlock
+type: Opaque
+stringData:
+  # ── LLM keys (set at least one) ───────────────────────────────────────────
+  ANTHROPIC_API_KEY: "sk-ant-api03-REPLACE_ME"
+  OPENAI_API_KEY: "sk-proj-REPLACE_ME"
+
+  # ── PostgreSQL password (must match postgres StatefulSet env below) ────────
+  DB_PASSWORD: "kubesherlock_pass"
+
+  # ── SMTP credentials (only needed if emailEnabled: true) ─────────────────
+  SMTP_USER: "alerts@yourdomain.com"
+  SMTP_PASSWORD: "your-smtp-app-password"
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. PostgreSQL schema init script (runs automatically on first boot)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: kubesherlock
+data:
+  01-schema.sql: |
+    -- KubeSherlock investigation history schema
+    -- All objects live in the dedicated "kubesherlock" schema, not "public".
+    CREATE SCHEMA IF NOT EXISTS kubesherlock;
+
+    CREATE TABLE IF NOT EXISTS kubesherlock.investigations (
+        id               SERIAL PRIMARY KEY,
+        question         TEXT          NOT NULL,
+        namespace        VARCHAR(255),
+        resource_name    VARCHAR(255),
+        root_cause       TEXT,
+        recommendations  TEXT,
+        answer           TEXT,
+        provider         VARCHAR(50),
+        iterations       INT,
+        tool_calls_count INT,
+        duration_seconds FLOAT,
+        status           VARCHAR(50),
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS kubesherlock.investigation_findings (
+        id               SERIAL PRIMARY KEY,
+        investigation_id INT NOT NULL REFERENCES kubesherlock.investigations(id) ON DELETE CASCADE,
+        finding_type     VARCHAR(100),
+        severity         VARCHAR(50),
+        content          TEXT NOT NULL,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS kubesherlock.investigation_tool_calls (
+        id                SERIAL PRIMARY KEY,
+        investigation_id  INT NOT NULL REFERENCES kubesherlock.investigations(id) ON DELETE CASCADE,
+        tool_name         VARCHAR(255) NOT NULL,
+        arguments         JSONB,
+        result_summary    TEXT,
+        execution_time_ms INT,
+        created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS kubesherlock.metrics (
+        id           SERIAL PRIMARY KEY,
+        timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        metric_name  VARCHAR(255) NOT NULL,
+        metric_value FLOAT        NOT NULL,
+        labels       JSONB
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_investigations_namespace  ON kubesherlock.investigations(namespace);
+    CREATE INDEX IF NOT EXISTS idx_investigations_resource   ON kubesherlock.investigations(resource_name);
+    CREATE INDEX IF NOT EXISTS idx_investigations_created_at ON kubesherlock.investigations(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_findings_type             ON kubesherlock.investigation_findings(finding_type);
+    CREATE INDEX IF NOT EXISTS idx_tool_calls_investigation  ON kubesherlock.investigation_tool_calls(investigation_id);
+    CREATE INDEX IF NOT EXISTS idx_tool_calls_name           ON kubesherlock.investigation_tool_calls(tool_name);
+    CREATE INDEX IF NOT EXISTS idx_metric_name               ON kubesherlock.metrics(metric_name);
+    CREATE INDEX IF NOT EXISTS idx_metric_timestamp          ON kubesherlock.metrics(timestamp);
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. PostgreSQL credentials secret (internal — used by the StatefulSet itself)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kubesherlock-postgres
+    app.kubernetes.io/part-of: kubesherlock
+type: Opaque
+stringData:
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "kubesherlock_pass"   # must match DB_PASSWORD in kubesherlock-secrets above
+  POSTGRES_DB: "kubesherlock"
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. PostgreSQL — StatefulSet
+#    Uses a StatefulSet (not Deployment) so the PVC is stable across restarts.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kubesherlock-postgres
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kubesherlock-postgres
+    app.kubernetes.io/part-of: kubesherlock
+spec:
+  serviceName: kubesherlock-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubesherlock-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubesherlock-postgres
+        app.kubernetes.io/part-of: kubesherlock
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        ports:
+        - name: postgres
+          containerPort: 5432
+          protocol: TCP
+        envFrom:
+        - secretRef:
+            name: postgres-credentials
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres", "-d", "kubesherlock"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 6
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+          subPath: pgdata          # subPath avoids "lost+found" errors on some volume types
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+      volumes:
+      - name: init-sql
+        configMap:
+          name: postgres-init-sql
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+      labels:
+        app.kubernetes.io/part-of: kubesherlock
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 2Gi
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. PostgreSQL — ClusterIP Service
+#    Accessible inside the cluster as "kubesherlock-postgres:5432"
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubesherlock-postgres
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kubesherlock-postgres
+    app.kubernetes.io/part-of: kubesherlock
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: kubesherlock-postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: postgres
+    protocol: TCP
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Prometheus scrape configuration
+#    Scrapes the KubeSherlock metrics sidecar (service: kubesherlock-kubesherlock-metrics)
+#    and node metrics.
+#    The job name "kubesherlock-agent" matches what the existing prometheus.yml uses.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kubesherlock-prometheus
+    app.kubernetes.io/part-of: kubesherlock
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: "kubesherlock-test"
+
+    scrape_configs:
+      # KubeSherlock metrics sidecar
+      # Service name: <helm-release>-kubesherlock-metrics  (default release = "kubesherlock")
+      - job_name: "kubesherlock-agent"
+        static_configs:
+          - targets: ["kubesherlock-kubesherlock-metrics:8000"]
+            labels:
+              app: "kubesherlock"
+        scrape_interval: 10s
+        metrics_path: /metrics
+
+      # Prometheus self-monitoring
+      - job_name: "prometheus"
+        static_configs:
+          - targets: ["localhost:9090"]
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. Prometheus — Deployment
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubesherlock-prometheus
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kubesherlock-prometheus
+    app.kubernetes.io/part-of: kubesherlock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubesherlock-prometheus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubesherlock-prometheus
+        app.kubernetes.io/part-of: kubesherlock
+    spec:
+      # Prometheus needs to write to /prometheus — securityContext matches the
+      # official prom/prometheus image which runs as nobody (uid 65534).
+      securityContext:
+        runAsUser: 65534
+        runAsNonRoot: true
+        fsGroup: 65534
+      containers:
+      - name: prometheus
+        image: prom/prometheus:latest
+        args:
+        - "--config.file=/etc/prometheus/prometheus.yml"
+        - "--storage.tsdb.path=/prometheus"
+        - "--storage.tsdb.retention.time=7d"
+        - "--web.enable-lifecycle"              # allows config reload via POST /-/reload
+        ports:
+        - name: http
+          containerPort: 9090
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 15
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+          readOnly: true
+        - name: data
+          mountPath: /prometheus
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+      - name: data
+        emptyDir: {}        # ephemeral storage — swap for a PVC if you want persistence
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. Prometheus — ClusterIP Service
+#    Accessible inside the cluster as "kubesherlock-prometheus:9090"
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubesherlock-prometheus
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kubesherlock-prometheus
+    app.kubernetes.io/part-of: kubesherlock
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: kubesherlock-prometheus
+  ports:
+  - name: http
+    port: 9090
+    targetPort: http
+    protocol: TCP
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Prometheus — NodePort Service  (optional — for direct browser access)
+#    Access from your laptop: http://<node-ip>:30909
+#    On minikube: minikube service kubesherlock-prometheus-np --url
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubesherlock-prometheus-np
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kubesherlock-prometheus
+    app.kubernetes.io/part-of: kubesherlock
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: kubesherlock-prometheus
+  ports:
+  - name: http
+    port: 9090
+    targetPort: http
+    nodePort: 30909          # fixed port — change if it conflicts
+    protocol: TCP

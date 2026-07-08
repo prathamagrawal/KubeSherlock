@@ -249,9 +249,21 @@ class Watcher:
         log.info(f"🔍 Auto-investigation triggered for {key} (reason: {failure.reason})")
 
         try:
+            memory = None
+            if os.environ.get("DB_HOST"):
+                try:
+                    from database.db import get_db
+                    from .memory import InvestigationMemory
+                    db = await get_db()
+                    memory = InvestigationMemory(db)
+                    log.info("🔌 Database memory configured for investigator")
+                except Exception as db_err:
+                    log.warning("⚠️ Could not initialize database memory: %s", db_err)
+
             investigator = Investigator(
                 mcp_client=mcp_client,
                 provider=self._config.provider,
+                memory=memory,
             )
             log.debug(f"   Running investigation with {self._config.provider}...")
             result = await investigator.investigate(question)

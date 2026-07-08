@@ -1,0 +1,116 @@
+# =============================================================================
+# KubeSherlock — Test Helm Values
+# =============================================================================
+# Companion file for helm/test-stack.yaml.
+# Used to install KubeSherlock pointing at the in-cluster PostgreSQL and
+# Prometheus services deployed by test-stack.yaml.
+#
+# Apply the infra first, then install:
+#
+#   kubectl apply -f helm/test-stack.yaml
+#   kubectl rollout status statefulset/kubesherlock-postgres   # wait for PG to be ready
+#   helm install kubesherlock ./helm/kubesherlock -f helm/test-values.yaml
+#
+# Upgrade after a config change:
+#   helm upgrade kubesherlock ./helm/kubesherlock -f helm/test-values.yaml
+#
+# Full teardown:
+#   helm uninstall kubesherlock
+#   kubectl delete -f helm/test-stack.yaml
+#   kubectl delete pvc postgres-data-kubesherlock-postgres-0
+# =============================================================================
+
+image:
+  repository: prathamagrawal/kubesherlock
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+serviceAccount:
+  create: true
+  name: kubesherlock
+
+rbac:
+  create: true
+
+# ── Watcher ───────────────────────────────────────────────────────────────────
+config:
+  watcherEnabled: true
+  watcherPollInterval: 60           # poll every 60 s
+  watcherRestartThreshold: 3        # investigate after 3 restarts
+  watcherCooldown: 300              # wait 5 min before re-investigating same pod
+  llmProvider: openai               # "openai" or "anthropic"
+  allowedNamespaces:
+    - default
+    - kube-system
+  logLevel: INFO
+  emailEnabled: false               # flip to true and fill email block below to test alerts
+
+# ── Credentials ───────────────────────────────────────────────────────────────
+# Points at the pre-created secret from test-stack.yaml
+secrets:
+  existingSecret: kubesherlock-secrets
+
+# ── Email (only needed when config.emailEnabled: true) ────────────────────────
+email:
+  smtpHost: smtp.gmail.com
+  smtpPort: 587
+  smtpUseTls: true
+  smtpFrom: ""                      # e.g. kubesherlock@yourdomain.com
+  alertEmailTo: ""                  # e.g. oncall@yourdomain.com
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+# Points at the in-cluster StatefulSet from test-stack.yaml
+# Service DNS: kubesherlock-postgres.default.svc.cluster.local
+postgresql:
+  enabled: true
+  host: "kubesherlock-postgres"     # ClusterIP service name from test-stack.yaml
+  port: 5432
+  database: kubesherlock
+  user: postgres
+  schema: kubesherlock              # dedicated schema — not public
+  # DB_PASSWORD comes from secrets.existingSecret (key: DB_PASSWORD)
+
+# ── Prometheus metrics sidecar ────────────────────────────────────────────────
+# Adds a second container running agent.metrics_server on port 8000.
+# Prometheus scrapes it via the kubesherlock-kubesherlock-metrics ClusterIP service.
+metrics:
+  enabled: true
+  port: 8000
+  serviceMonitor:
+    enabled: false                  # set true if you have Prometheus Operator installed
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+metricsResources:
+  limits:
+    cpu: 100m
+    memory: 64Mi
+  requests:
+    cpu: 50m
+    memory: 32Mi
+
+# ── Security ──────────────────────────────────────────────────────────────────
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
