@@ -37,6 +37,9 @@ def detect_severity(result: InvestigationResult, failure: PodFailure) -> str:
     # CRITICAL: Resource exhaustion or persistent failures
     if any(k in reason for k in ["oomkilled", "outofmemory"]):
         return "CRITICAL"
+    # Also check answer text — watcher uses "PodFailed" as reason even for OOMKilled pods
+    if any(k in answer for k in ["oomkilled", "out of memory", "memory limit", "outofmemory"]):
+        return "CRITICAL"
     if "disk" in answer and any(k in answer for k in ["full", "pressure", "space"]):
         return "CRITICAL"
     if failure.restart_count >= 10:
